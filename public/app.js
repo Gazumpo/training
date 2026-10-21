@@ -1,12 +1,12 @@
-import { DAYS, SESSIONS, EXERCISES, SLOTS, WORKLOADS, ENDURANCE, PREHAB } from './data.js?v=core-review-20261021';
-import { defaultLevels, validateLevels, STORAGE_KEY, rideDistance, weightLabel, selectedExercises, prehabExercises, exercisePrescription } from './model.js?v=core-review-20261021';
-import { exerciseDiagram } from './diagrams.js?v=core-review-20261021';
-import { EXERCISE_MEDIA } from './media.js?v=core-review-20261021';
+import { DAYS, SESSIONS, EXERCISES, SLOTS, WORKLOADS, ENDURANCE, PREHAB } from './data.js?v=friday-prehab-20261021';
+import { defaultLevels, validateLevels, STORAGE_KEY, rideDistance, weightLabel, selectedExercises, prehabExercises, exercisePrescription } from './model.js?v=friday-prehab-20261021';
+import { exerciseDiagram } from './diagrams.js?v=friday-prehab-20261021';
+import { EXERCISE_MEDIA } from './media.js?v=friday-prehab-20261021';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-const categoryNames = { bouldering: 'Bouldering', cycling: 'Cycling', strength: 'Strength', recovery: 'Recovery' };
+const categoryNames = { bouldering: 'Bouldering', cycling: 'Cycling', strength: 'Strength', recovery: 'Recovery', prehab: 'Prehab' };
 let levels = defaultLevels();
 let storageAvailable = true;
 let loadWarning = '';
@@ -67,16 +67,17 @@ function exerciseBody(exercise, prefix) {
   const slot = SLOTS.find(item => item.id === exercise.slot);
   const selected = slot && levels.workout[exercise.slot] === exercise.id;
   const { sets, rest } = exercisePrescription(exercise, levels.workload);
-  const action = slot ? `<button class="${selected ? 'selected-button' : 'secondary-button'}" data-select-exercise="${exercise.id}" ${selected ? 'disabled' : ''}>${selected ? (slot.optional ? 'Selected optional exercise' : 'Selected for Tuesday') : `Use for ${slot.name.toLowerCase()} slot`}</button>` : `<p class="small-print">${PREHAB.exercises.includes(exercise.id) ? 'Scheduled after Tuesday strength and Friday easy climbing. Start with one set in the first week.' : 'Optional capacity work. Not part of the scheduled shoulder routine.'}</p>`;
-  return `<div class="exercise-body">${exerciseVisual(exercise)}<p class="movement-benefit">${exercise.benefit}</p><div class="dose-row"><strong>${sets} ${sets === 1 ? 'set' : 'sets'} × ${exercise.dose}</strong><span>Rest ${rest}</span></div>${weightInput(exercise, prefix)}<h4>How to do it</h4><ol class="instructions">${exercise.steps.map(step => `<li>${step}</li>`).join('')}</ol><div class="technique-tips"><h4>Keep in mind</h4><ul>${exercise.tips.map(tip => `<li>${tip}</li>`).join('')}</ul></div>${action}</div>`;
+  const current = slot && EXERCISES.find(item => item.id === levels.workout[slot.id]);
+  const action = slot ? `<div class="exercise-selection"><button class="${selected ? 'selected-button' : 'secondary-button'}" data-select-exercise="${exercise.id}" ${selected ? 'disabled' : ''}>${selected ? (slot.optional ? 'Selected optional exercise' : 'Selected for Tuesday') : (slot.optional ? 'Select optional exercise' : 'Select for Tuesday')}</button><p>${selected ? `Tuesday · ${slot.name}` : `Replaces ${current.name} · ${slot.name}`}</p></div>` : `<p class="small-print">${PREHAB.exercises.includes(exercise.id) ? 'Friday light prehab session. One set, with 3-4 good reps in reserve.' : 'Optional in Friday light prehab. One set only when your forearms are recovered.'}</p>`;
+  return `<div class="exercise-body">${prefix === 'library' ? action : ''}${exerciseVisual(exercise)}<p class="movement-benefit">${exercise.benefit}</p><div class="dose-row"><strong>${sets} ${sets === 1 ? 'set' : 'sets'} × ${exercise.dose}</strong><span>Rest ${rest}</span></div>${weightInput(exercise, prefix)}<h4>How to do it</h4><ol class="instructions">${exercise.steps.map(step => `<li>${step}</li>`).join('')}</ol><div class="technique-tips"><h4>Keep in mind</h4><ul>${exercise.tips.map(tip => `<li>${tip}</li>`).join('')}</ul></div>${prefix === 'library' ? '' : action}</div>`;
 }
 
 function exerciseRows(exercises, prefix) {
   return `<div class="gym-session-exercises">${exercises.map((exercise, index) => `<details class="workout-exercise"><summary><span class="exercise-index">${index+1}.</span><span><strong>${exercise.name}</strong><small>${exercisePrescription(exercise, levels.workload).sets} × ${exercise.dose}</small></span><span class="weight-tag" data-weight-label="${exercise.id}">${weightLabel(levels, exercise)}</span><span class="details-plus" aria-hidden="true">+</span></summary>${exerciseBody(exercise, prefix)}</details>`).join('')}</div>`;
 }
 
-function shoulderRoutine(id) {
-  return `<section class="support-routine"><h4>Shoulder care · Tuesday and Friday</h4><p>${PREHAB.description}</p>${exerciseRows(prehabExercises(), `prehab-${id}`)}<p class="small-print">${PREHAB.guidance}</p></section>`;
+function prehabRoutine(id) {
+  return `<section class="support-routine"><h4>Friday shoulder exercises</h4><p>${PREHAB.description}</p>${exerciseRows(prehabExercises(), `prehab-${id}`)}<h4>Optional wrist exercise</h4><p>One light set per side if recovered. Skip it when your forearms are tired.</p>${exerciseRows(prehabExercises('optional'), `prehab-optional-${id}`)}<p class="small-print">${PREHAB.guidance}</p></section>`;
 }
 
 function renderWorkloads() {
@@ -87,7 +88,7 @@ function renderWorkloads() {
 function renderCalendar() {
   $('#calendar').innerHTML = DAYS.map((day, dayIndex) => `<section class="day" aria-labelledby="day-${dayIndex}"><h3 id="day-${dayIndex}">${day.name}</h3><div class="day-sessions">${day.sessions.map(id => {
     const session = SESSIONS[id];
-    return `<button id="session-${id}" class="session-card ${session.category}${openSession === id ? ' is-open' : ''}" data-session="${id}" aria-expanded="${openSession === id}"${openSession === id ? ' aria-controls="session-detail"' : ''}><span class="category-label">${categoryNames[session.category]}</span><strong>${session.name}</strong><span class="session-meta" data-duration="${id}">${duration(session)}</span><span class="card-footer"><span>${id === 'gym' ? '5 main + shoulder care' : id === 'endurance' ? ENDURANCE[levels.endurance].doses[levels.workload] : session.intensity}</span><span class="expand-symbol" aria-hidden="true">${openSession === id ? '−' : '+'}</span></span></button>`;
+    return `<button id="session-${id}" class="session-card ${session.category}${openSession === id ? ' is-open' : ''}" data-session="${id}" aria-expanded="${openSession === id}"${openSession === id ? ' aria-controls="session-detail"' : ''}><span class="category-label">${categoryNames[session.category]}</span><strong>${session.name}</strong><span class="session-meta" data-duration="${id}">${duration(session)}</span><span class="card-footer"><span>${id === 'gym' ? '5 main exercises' : id === 'endurance' ? ENDURANCE[levels.endurance].doses[levels.workload] : session.intensity}</span><span class="expand-symbol" aria-hidden="true">${openSession === id ? '−' : '+'}</span></span></button>`;
   }).join('')}</div></section>${openSession && day.sessions.includes(openSession) ? sessionDetails(openSession) : ''}`).join('');
 }
 
@@ -96,26 +97,19 @@ function sessionDetails(id) {
   const day = DAYS.find(item => item.sessions.includes(id));
   const endurance = ENDURANCE[levels.endurance];
   const extra = id === 'endurance' ? `<div class="endurance-options"><h4>Choose your mode</h4><div class="mode-buttons" role="group" aria-label="Endurance mode">${Object.entries(ENDURANCE).map(([key, mode]) => `<button data-mode="${key}" aria-pressed="${levels.endurance === key}" class="${levels.endurance === key ? 'active' : ''}">${mode.name}</button>`).join('')}</div><p class="effort-prescription">${endurance.doses[levels.workload]}</p><p>${endurance.detail}</p></div>` : id === 'intervals' ? `<div class="interval-prescription"><strong>${session.efforts[levels.workload]}</strong><span>4 min easy between efforts · RPE 7-8</span></div>` : '';
-  return `<section id="session-detail" class="session-detail ${session.category}" aria-labelledby="detail-title"><div class="detail-heading"><div><p class="detail-category">${day.name} / ${categoryNames[session.category]}</p><h3 id="detail-title">${session.name}</h3><p class="detail-meta" data-duration="${id}">${duration(session)}</p></div><button class="secondary-button" data-close-session aria-label="Close ${session.name} details">Close</button></div><div class="detail-layout"><div><p class="detail-description">${session.description}</p><ol class="instructions">${session.steps.map(step => `<li>${step}</li>`).join('')}</ol>${extra}</div><aside class="detail-aside"><span class="intensity-badge">${session.intensity}</span><p>${session.tip}</p>${session.rideKey ? '<button class="text-button" data-settings>Set cycling benchmark</button>' : ''}</aside></div>${id === 'gym' ? `<h4>Main strength exercises</h4>${exerciseRows(selectedExercises(levels, 'main'), 'session')}${shoulderRoutine(id)}<section class="support-routine"><h4>Optional extras · only when recovered</h4><p>Calves are lower priority. Extra pulling is useful only if it addresses a weakness and you are fresh after Monday. Skip both when short on time or recovering poorly; allow extra time if included.</p>${exerciseRows(selectedExercises(levels, 'optional'), 'optional')}</section><button class="text-button library-link" data-open-library>Change exercises</button>` : PREHAB.sessions.includes(id) ? shoulderRoutine(id) : ''}</section>`;
-}
-
-function renderWorkoutStrip() {
-  const exercises = [...selectedExercises(levels, 'main'), ...prehabExercises(), ...selectedExercises(levels, 'optional')];
-  $('#workout-strip').innerHTML = exercises.map((exercise, index) => `<button data-show-exercise="${exercise.id}"><span class="strip-number">${index+1}.</span><strong>${exercise.name}${SLOTS.find(slot => slot.id === exercise.slot)?.optional ? ' (optional)' : ''}</strong><span data-weight-label="${exercise.id}">${weightLabel(levels, exercise)}</span></button>`).join('');
-}
-
-function renderWorkoutSelection() {
-  $('#workout-selection').innerHTML = SLOTS.map(slot => `<label><span>${slot.name}</span><select data-slot="${slot.id}" aria-label="Tuesday ${slot.name} exercise">${EXERCISES.filter(exercise => exercise.slot === slot.id).map(exercise => `<option value="${exercise.id}"${levels.workout[slot.id] === exercise.id ? ' selected' : ''}>${exercise.name}</option>`).join('')}</select></label>`).join('');
+  return `<section id="session-detail" class="session-detail ${session.category}" aria-labelledby="detail-title"><div class="detail-heading"><div><p class="detail-category">${day.name} / ${categoryNames[session.category]}</p><h3 id="detail-title">${session.name}</h3><p class="detail-meta" data-duration="${id}">${duration(session)}</p></div><button class="secondary-button" data-close-session aria-label="Close ${session.name} details">Close</button></div>${id === 'gym' ? '' : `<div class="detail-layout"><div><p class="detail-description">${session.description}</p><ol class="instructions">${session.steps.map(step => `<li>${step}</li>`).join('')}</ol>${extra}</div><aside class="detail-aside"><span class="intensity-badge">${session.intensity}</span><p>${session.tip}</p>${session.rideKey ? '<button class="text-button" data-settings>Set cycling benchmark</button>' : ''}</aside></div>`}${id === 'gym' ? `<h4>Main strength exercises</h4>${exerciseRows(selectedExercises(levels, 'main'), 'session')}<section class="support-routine"><h4>Optional extras · only when recovered</h4><p>Calves are lower priority. Extra pulling is useful only if it addresses a weakness and you are fresh after Monday. Skip both when short on time or recovering poorly; allow extra time if included.</p>${exerciseRows(selectedExercises(levels, 'optional'), 'optional')}</section><button class="text-button library-link" data-open-library>Change exercises</button>` : PREHAB.sessions.includes(id) ? prehabRoutine(id) : ''}</section>`;
 }
 
 function renderLibrary() {
+  const openCards = new Set($$('#exercise-library > details[open]').map(card => card.id));
   const matching = EXERCISES.filter(exercise => (filter === 'all' || exercise.group === filter) && `${exercise.name} ${exercise.equipment} ${exercise.benefit}`.toLowerCase().includes(query));
   $('#exercise-count').textContent = `${matching.length} exercise${matching.length === 1 ? '' : 's'}`;
-  $('#exercise-library').innerHTML = matching.length ? matching.map(exercise => `<details class="exercise-card ${exercise.group}" id="exercise-${exercise.id}"><summary><span class="exercise-card-top"><span class="movement-group">${exercise.group}</span>${PREHAB.exercises.includes(exercise.id) ? '<span class="in-workout">Tue + Fri</span>' : levels.workout[exercise.slot] === exercise.id ? `<span class="in-workout">${SLOTS.find(slot => slot.id === exercise.slot).optional ? 'Optional' : 'Selected'}</span>` : ''}</span><span class="exercise-card-name">${exercise.name}</span><span class="equipment">${exercise.equipment}</span><span class="exercise-card-bottom"><span data-weight-label="${exercise.id}">${weightLabel(levels, exercise)}</span><span class="details-plus" aria-hidden="true">+</span></span></summary>${exerciseBody(exercise, 'library')}</details>`).join('') : '<p class="empty-state">No exercises match. Try another search or choose All.</p>';
+  $('#exercise-library').innerHTML = matching.length ? matching.map(exercise => `<details class="exercise-card ${exercise.group}" id="exercise-${exercise.id}"><summary><span class="exercise-card-top"><span class="movement-group">${exercise.group}</span>${exercise.group === 'prehab' ? `<span class="in-workout">${PREHAB.optional.includes(exercise.id) ? 'Friday (optional)' : 'Friday'}</span>` : levels.workout[exercise.slot] === exercise.id ? `<span class="in-workout">${SLOTS.find(slot => slot.id === exercise.slot).optional ? 'Tuesday (optional)' : 'Tuesday'}</span>` : ''}</span><span class="exercise-card-name">${exercise.name}</span><span class="equipment">${exercise.equipment}</span><span class="exercise-card-bottom"><span data-weight-label="${exercise.id}">${weightLabel(levels, exercise)}</span><span class="details-plus" aria-hidden="true">+</span></span></summary>${exerciseBody(exercise, 'library')}</details>`).join('') : '<p class="empty-state">No exercises match. Try another search or choose All.</p>';
+  $$('#exercise-library > details').forEach(card => { card.open = openCards.has(card.id); });
 }
 
 function renderLevels() {
-  $('#levels-fields').innerHTML = `<h3>On the bike</h3><label class="level-input" for="ride-benchmark"><span>Cycling benchmark<small>A long ride you can comfortably complete</small></span><span class="input-wrap"><input id="ride-benchmark" data-ride="benchmark" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Not set" value="${levels.rides.benchmark}" aria-describedby="ride-benchmark-help"><span>km</span></span></label><p id="ride-benchmark-help" class="small-print">One distance sets all ride guides: easy 50%, intervals 75%, long ride 100%. For example, 40 km gives 20, 30 and 40 km. Follow each session's time and effort guidance, and adjust the route to suit.</p><h3>In your workout</h3>${[...selectedExercises(levels), ...prehabExercises()].map(exercise => `<div class="settings-exercise"><p>${exercise.name}</p>${weightInput(exercise, 'settings')}</div>`).join('')}<p class="small-print">Other exercises keep their own working weight in the gym library. Use 0 for no added load.</p>`;
+  $('#levels-fields').innerHTML = `<h3>On the bike</h3><label class="level-input" for="ride-benchmark"><span>Cycling benchmark<small>A long ride you can comfortably complete</small></span><span class="input-wrap"><input id="ride-benchmark" data-ride="benchmark" type="number" min="0" max="1000" step="any" inputmode="decimal" placeholder="Not set" value="${levels.rides.benchmark}" aria-describedby="ride-benchmark-help"><span>km</span></span></label><p id="ride-benchmark-help" class="small-print">One distance sets all ride guides: easy 50%, intervals 75%, long ride 100%. For example, 40 km gives 20, 30 and 40 km. Follow each session's time and effort guidance, and adjust the route to suit.</p><h3>Tuesday strength</h3>${selectedExercises(levels).map(exercise => `<div class="settings-exercise"><p>${exercise.name}</p>${weightInput(exercise, 'settings')}</div>`).join('')}<h3>Friday light prehab</h3>${prehabExercises('all').map(exercise => `<div class="settings-exercise"><p>${exercise.name}${PREHAB.optional.includes(exercise.id) ? ' (optional)' : ''}</p>${weightInput(exercise, 'settings-friday')}</div>`).join('')}<p class="small-print">Other exercises keep their own working weight in the gym library. Use 0 for no added load.</p>`;
 }
 
 function openSettings() {
@@ -139,17 +133,19 @@ function showPanel(name) {
     $(`#${key}-tab`).setAttribute('aria-selected', String(active));
     $(`#${key}-tab`).tabIndex = active ? 0 : -1;
   });
-  if (name === 'library') { renderWorkoutSelection(); renderLibrary(); }
+  if (name === 'library') { renderLibrary(); }
 }
 
 function selectExercise(id) {
   const exercise = EXERCISES.find(item => item.id === id);
+  if (!exercise?.slot || levels.workout[exercise.slot] === id) return;
+  const previous = EXERCISES.find(item => item.id === levels.workout[exercise.slot]);
   levels.workout[exercise.slot] = id;
   save();
-  renderWorkoutSelection(); renderWorkoutStrip(); renderCalendar(); renderLibrary();
+  renderCalendar(); renderLibrary();
   const detail = $(`#exercise-${id}`);
   if (detail) { detail.open = true; detail.querySelector('summary').focus({ preventScroll: true }); }
-  notify(`${exercise.name} added to your Tuesday workout.`);
+  if (storageAvailable) notify(`${exercise.name} replaces ${previous.name} in your Tuesday workout.`);
 }
 
 function showExercise(id) {
@@ -205,9 +201,6 @@ document.addEventListener('click', event => {
     renderLibrary();
   }
   if (button.matches('[data-select-exercise]')) selectExercise(button.dataset.selectExercise);
-  if (button.matches('[data-show-exercise]')) {
-    showExercise(button.dataset.showExercise);
-  }
 });
 
 document.addEventListener('input', event => {
@@ -221,10 +214,6 @@ document.addEventListener('input', event => {
     $$(`[data-weight="${input.dataset.weight}"]`).filter(item => item !== input).forEach(item => { item.value = input.value; });
   } else levels.rides[input.dataset.ride] = value;
   save(); refreshDerived();
-});
-
-document.addEventListener('change', event => {
-  if (event.target.matches('[data-slot]')) selectExercise(event.target.value);
 });
 
 document.addEventListener('toggle', event => {
@@ -265,13 +254,13 @@ $('#import-data').addEventListener('change', async event => {
     if (file.size > 100000) throw new Error('This file is too large for a Training levels backup.');
     const imported = validateLevels(JSON.parse(await file.text()));
     levels = imported; save();
-    renderWorkloads(); renderCalendar(); renderWorkoutStrip(); renderWorkoutSelection(); renderLibrary();
+    renderWorkloads(); renderCalendar(); renderLibrary();
     notify(storageAvailable ? 'Your levels and workout choices have been imported and saved.' : 'Levels imported for this visit. Browser saving is unavailable.');
   } catch (error) { notify(error instanceof SyntaxError ? 'This file is not valid JSON. Your current levels are unchanged.' : `${error.message} Your current levels are unchanged.`); }
   finally { event.target.value = ''; }
 });
 
-renderWorkloads(); renderCalendar(); renderWorkoutStrip(); renderWorkoutSelection(); renderLibrary();
+renderWorkloads(); renderCalendar(); renderLibrary();
 window.addEventListener('hashchange', showLinkedExercise);
 showLinkedExercise();
 if (loadWarning) notify(loadWarning);

@@ -1,4 +1,4 @@
-import { EXERCISES, SLOTS, WORKLOADS, PREHAB } from './data.js?v=core-review-20261021';
+import { EXERCISES, SLOTS, WORKLOADS, PREHAB } from './data.js?v=friday-prehab-20261021';
 import { BASE_LEVELS } from './base-levels.js?v=base-levels-20261021';
 
 export const STORAGE_KEY = 'pickledonion.training.v1';
@@ -77,12 +77,13 @@ export function selectedExercises(levels, scope = 'all') {
     .map(slot => EXERCISES.find(exercise => exercise.id === levels.workout[slot.id]));
 }
 
-export function prehabExercises() {
-  return PREHAB.exercises.map(id => EXERCISES.find(exercise => exercise.id === id));
+export function prehabExercises(scope = 'main') {
+  const ids = scope === 'optional' ? PREHAB.optional : scope === 'all' ? [...PREHAB.exercises, ...PREHAB.optional] : PREHAB.exercises;
+  return ids.map(id => EXERCISES.find(exercise => exercise.id === id));
 }
 
 export function exercisePrescription(exercise, workload) {
-  const sets = PREHAB.optional.includes(exercise.id) ? 1 : WORKLOADS[workload].sets;
+  const sets = [...PREHAB.exercises, ...PREHAB.optional].includes(exercise.id) ? PREHAB.sets : WORKLOADS[workload].sets;
   const rest = exercise.rest || (['leg', 'hinge'].includes(exercise.slot) ? '2-3 min' : '60-90 sec');
   return { sets, rest };
 }

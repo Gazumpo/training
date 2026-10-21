@@ -100,11 +100,12 @@ test('imports reject invalid numbers and mismatched exercise slots before accept
   for (const change of [{ version: 2 }, { workload: 'unknown' }, { workload: '__proto__' }, { workload: null }, { workload: ['normal'] }, { endurance: 'both' }, { format: 'other' }]) assert.throws(() => validateLevels({ ...defaultLevels(), ...change }));
 });
 
-test('weekly template has eight activities, one Wednesday option and separate Tuesday workouts', () => {
+test('weekly template separates Tuesday strength and Friday prehab with one Wednesday option', () => {
   assert.equal(DAYS.length, 7);
-  assert.equal(DAYS.flatMap(day => day.sessions).length, 8);
+  assert.equal(DAYS.flatMap(day => day.sessions).length, 9);
   assert.deepEqual(DAYS[1].sessions, ['easy-ride', 'gym']);
   assert.deepEqual(DAYS[2].sessions, ['endurance']);
+  assert.deepEqual(DAYS[4].sessions, ['technique', 'prehab']);
   assert.equal(DAYS.flatMap(day => day.sessions).filter(id => SESSIONS[id].category === 'bouldering').length, 3);
   assert.equal(DAYS.flatMap(day => day.sessions).filter(id => SESSIONS[id].category === 'cycling').length, 3);
   assert.deepEqual(DAYS[6].sessions, ['rest']);
@@ -151,13 +152,19 @@ test('original six-slot backups migrate without losing rides, weights or exercis
   }
 });
 
-test('main work, optional extras and scheduled shoulder care remain distinct', () => {
+test('Friday prehab stays light and separate from Tuesday strength', () => {
   const levels = defaultLevels();
   assert.deepEqual(selectedExercises(levels, 'main').map(item => item.id), ['split-squat', 'rdl', 'bench-press', 'side-plank', 'hanging-leg-raise']);
   assert.deepEqual(selectedExercises(levels, 'optional').map(item => item.id), ['calf-raise', 'row']);
   assert.deepEqual(prehabExercises().map(item => item.id), PREHAB.exercises);
   assert.ok(!prehabExercises().some(item => item.id === 'wrist-extension'));
-  assert.deepEqual(PREHAB.sessions, ['gym', 'technique']);
+  assert.deepEqual(PREHAB.sessions, ['prehab']);
+  assert.deepEqual(prehabExercises('optional').map(item => item.id), ['wrist-extension']);
+  assert.deepEqual(prehabExercises('all').map(item => item.id), [...PREHAB.exercises, ...PREHAB.optional]);
+  assert.ok(!selectedExercises(levels).some(item => item.group === 'prehab'));
+  for (const workload of Object.keys(WORKLOADS)) {
+    for (const exercise of prehabExercises('all')) assert.equal(exercisePrescription(exercise, workload).sets, 1);
+  }
   const find = id => EXERCISES.find(item => item.id === id);
   assert.deepEqual(exercisePrescription(find('rdl'), 'normal'), { sets: 2, rest: '2-3 min' });
   assert.deepEqual(exercisePrescription(find('external-rotation'), 'lighter'), { sets: 1, rest: '45-60 sec' });
